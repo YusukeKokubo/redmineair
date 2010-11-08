@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:view="com.appspot.redmineAir.view.*"
+	horizontalAlign="center" verticalAlign="middle" title="Application Log"
+	width="536" height="270" showCloseButton="true"
+	verticalGap="2" horizontalGap="2" paddingTop="1">
+	<view:LogWindowViewHelper id="viewHelper"/>
+<mx:TextArea id="txtlogContent" width="95%" height="200" verticalScrollPolicy="auto" editable="false"
+			 horizontalScrollPolicy="auto">	
+</mx:TextArea>
+<mx:LinkButton width="100%" textAlign="right" fontStyle="italic" fontWeight="normal" color="#26127C" id="lbLogFile"/>
+</mx:TitleWindow>
