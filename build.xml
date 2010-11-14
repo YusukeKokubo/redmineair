@@ -19,7 +19,7 @@
 
 	<!-- Project properties -->
 	<property name="PROJ_ROOT_DIR" value="."/>
-	<property name="APP_NAME" value="redmineair"/>
+	<property name="APP_NAME" value="redmineAir"/>
 	<property name="APP_ROOT_DIR" location="${PROJ_ROOT_DIR}"/>
 	<property name="APP_SRC_DIR" location="${APP_ROOT_DIR}/src"/>
 	<property name="APP_ROOT_FILE" value="${APP_NAME}.swf"/>
