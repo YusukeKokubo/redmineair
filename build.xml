@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- ======================================================================
-     RedmineAir
+     redmineair
 
      http://www.r-labs.org/projects/redmineair
      ====================================================================== -->
-<project name="redmineAir" basedir="." default="package">
+<project name="redmineair" basedir="." default="package">
 
 	<property file="build.properties" />
 
@@ -19,11 +19,11 @@
 
 	<!-- Project properties -->
 	<property name="PROJ_ROOT_DIR" value="."/>
-	<property name="APP_NAME" value="redmineAir"/>
+	<property name="APP_NAME" value="redmineair"/>
 	<property name="APP_ROOT_DIR" location="${PROJ_ROOT_DIR}"/>
 	<property name="APP_SRC_DIR" location="${APP_ROOT_DIR}/src"/>
 	<property name="APP_ROOT_FILE" value="${APP_NAME}.swf"/>
-	<property name="APP_DESCRIPTOR" location="${APP_SRC_DIR}/redmineAir-app.xml"/>
+	<property name="APP_DESCRIPTOR" location="${APP_SRC_DIR}/redmineair-app.xml"/>
     <property name="APP_SOURCE_FILE" value="${APP_ROOT_DIR}/src/${APP_NAME}.mxml"/> 	
 	<property name="AIR_NAME" value="${APP_NAME}.air"/>
 	<property name="debug"  location="${PROJ_ROOT_DIR}/debug"/> 
@@ -47,6 +47,8 @@
             <arg value="-file-specs=${APP_SOURCE_FILE}"/> 
             <arg value="-output=${debug}/${APP_ROOT_FILE}"/> 
             <arg value="-allow-source-path-overlap=true" />
+            <arg value="-locale=ja_JP,en_US" />
+            <arg value="-source-path=locale/{locale}" />            
 			<arg value="-external-library-path+=libs/as3corelib.swc"/>
         	<arg value="-theme=${FLEX_HOME}/frameworks/themes/Halo/halo.swc"/>
 
@@ -77,11 +79,12 @@
 	<!-- mxmlcの実行 -->
 	<target name="compile" depends="init">
 		<mxmlc file="${APP_SRC_DIR}/${APP_NAME}.mxml" output="${APP_ROOT_DIR}/${APP_NAME}.swf"
-		  allow-source-path-overlap="true">
+		  allow-source-path-overlap="true" locale="ja_JP,en_US">
 			<!-- mxmlc file="${APP_ROOT}/src/Report.mxml" keep-generated-actionscript="true" -->
 			<!-- load-config filename="${FLEX_HOME}/frameworks/flex-config.xml"/ -->
 			<load-config filename="${FLEX_HOME}/frameworks/air-config.xml" />
             <source-path path-element="${FLEX_HOME}/frameworks" />
+            <source-path path-element="locale/{locale}" />
 			 <library-path dir="${basedir}/libs" append="true">                                  
 			 		<include name="as3corelib.swc" />
 			 </library-path>
