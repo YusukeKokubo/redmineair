@@ -7,7 +7,9 @@ import com.appspot.redmineAir.view.SaveRedmineWindow;
 import flash.events.Event;
 import flash.events.MouseEvent;
 import flash.filesystem.File;
+import flash.utils.*;
 
+import mx.collections.ArrayList;
 import mx.collections.XMLListCollection;
 import mx.controls.Alert;
 import mx.events.CloseEvent;
@@ -19,6 +21,7 @@ import mx.rpc.AsyncToken;
 import mx.rpc.events.FaultEvent;
 import mx.rpc.events.ResultEvent;
 import mx.rpc.http.HTTPService;
+import mx.utils.*;
 import mx.utils.ObjectUtil;
 
 private static const log:ILogger = Log.getLogger("main");
@@ -38,6 +41,9 @@ private var redmineXML:XML = <root/>;
 
 [Bindable]
 private var activityXML:XML = <root/>;
+
+[Bindable]
+private var projectXML:XML = <root><projects><project><name>All</name></project></projects></root>;
 
 public static function get appName(): String 
 {
@@ -225,7 +231,22 @@ private function loadRedmineSettingHandler(e:SQLEvent):void
 			feedService.url = correctURL(rs);
 			var fd:AsyncToken = feedService.send()
 			fd.redmineId = result.data[i]["id"];
-			fd.redmineName = result.data[i]["name"];			
+			fd.redmineName = result.data[i]["name"];
+			
+			// HTTP service for projects.
+			var projectService:HTTPService = new HTTPService();
+			projectService.useProxy = false;
+			projectService.resultFormat = "e4x";
+			projectService.addEventListener(ResultEvent.RESULT, loadProjectComplete);
+			projectService.addEventListener(FaultEvent.FAULT, ioErrorHandler);
+			var projectRs:String = result.data[i]["url"];
+			projectRs = projectRs + "projects.xml?";
+			if (result.data[i]["key"] != null && result.data[i]["key"].length > 0)
+				projectRs =projectRs + "&key=" + result.data[i]["key"]
+			projectService.url = correctURL(projectRs);
+			var pt:AsyncToken = projectService.send()
+			pt.redmineId = result.data[i]["id"];
+			pt.redmineName = result.data[i]["name"];
 		}
 		trRedmine.selectedIndex = 0;
 		callLater(treeInit);
@@ -261,6 +282,26 @@ private function loadFeedComplete(event:ResultEvent):void
 	activityXML.appendChild(resultXML);
 }
 
+private function loadProjectComplete(event:ResultEvent):void
+{
+	var resultXML:XML;
+	var xml:XML;
+	var event:* = event;
+	log.info(resultXML);
+	resultXML = event.target.lastResult as XML;
+	resultXML.@redmineId = event.token.redmineId.toString();
+	resultXML.@redmineName = event.token.redmineName.toString();
+	
+	for (var i:int = 0; i < resultXML.project.length; i++) {
+		xml = resultXML.project[i];
+		xml.redmineId = resultXML.@redmineId;
+		xml.redmineName = resultXML.@redmineName;
+	}
+	this.projectXML.appendChild(resultXML);
+	return;
+}
+
+
 private function ioErrorHandler(event:FaultEvent):void
 {
 	Alert.show(ObjectUtil.toString(event.fault),"Error");
@@ -270,11 +311,94 @@ private function ioErrorHandler(event:FaultEvent):void
 	callLater(treeInit);
 }
 
+private function applyFilters(event:Event): void 
+{
+	var aList:XMLList;
+	var iList:XMLList;
+	var pList:XMLList;
+	var child:String;
+	var arry:ArrayList;
+	
+	var o:Object;
+	var p:Object;
+	var reg:RegExp;
+	var event:* = event;
+	var target:* = this.trRedmine.selectedItem as XML;
+	var aXML:* = this.activityXML.copy();
+	var iXML:* = this.issueXML.copy();
+	if (target == null || target.@name == "All") {
+		iList = iXML.children();
+		aList = aXML.atom::feed.entry;
+		pList = iList.issue;
+	} else {
+		var xmlList:XMLList = new XMLList("");
+		iList = iXML.children();
+
+		for (var i:int = 0; i < iXML.issues.length; i++) {
+			var xml:XML = iXML.issues[i] as XML;
+			if (xml.@redmineId == target.@Id) {
+				xmlList[i] = xml;
+			}
+		}
+		
+		var aXmlList:XMLList = new XMLList("");	
+		for (var l:int = 0; l < (aXML.atom::feed as XMLList).length(); l++) {
+			var xml:XML = aXML.atom::feed[l] as XML;
+			if (xml.@redmineId == target.@Id) {
+				aXmlList[l] = xml;
+			}
+		}	
+		
+		aList = aXmlList.entry;
+		pList = iList.children();
+
+	}
+	aList = this.applyAuthorFilter(aList);
+	iList = this.applyProjectFilter(iList);
+	var map:Object = new Object();
+	var list: XMLList = pList.project.@name;
+	for (var c:int = 0; c < list.length(); c++) {
+		child = list[i];
+		reg = new RegExp(child);
+		var n:int = 0;
+		var pl:XMLList = this.projectXML.projects.project;
+		var pXmlList:XMLList = new XMLList("");
+		for (var n:int = 0; n < pl.length; n++) {
+			var v:* = pl[n];
+			if (reg.test(v.name)) {
+				pXmlList[n] = v;
+			}
+		}
+		o = pXmlList[0];
+		map[child] = o as XML;
+	}
+	arry = new ArrayList();
+	arry.addItem(<project><name>All</name></project> as XML);
+	for (var key:Object in map) {
+		p = key;
+		arry.addItem(p);
+	}
+	this.cmbProject.dataProvider = arry;
+	iXML = <root/>;
+	iXML.appendChild(iList);
+	this.dgAssigned.dataProvider = iXML.issues.issue;
+	this.dgActivity.dataProvider = aList;
+	
+	if (cmbProject.selectedItem == null) {
+		lbIssueCount.text = "All (" + this.dgAssigned.dataProvider.length+ ")";
+	} else {
+		lbIssueCount.text = cmbProject.selectedItem.name + "(" + this.dgAssigned.dataProvider.length+ ")";		
+	}
+	// return
+}
+
 private function applyFilter(event:Event): void 
 {
 	var target:XML = event.target.selectedItem as XML;
 	var aXML:XML = activityXML.copy();
 	var iXML:XML = issueXML.copy();
+	var pList:XMLList;
+	var child:String;
 	
 	if (target.@name == "All") {
 		dgAssigned.dataProvider = iXML.issues.issue;
@@ -428,6 +552,58 @@ private function goProject(event:Event):void
 	navigateToURL(u,"_blank");
 }
 
+private function applyAuthorFilter(param:XMLList):XMLList
+{
+	var list:XMLList = param;
+	var result:XMLList = list;
+	var key:* = this.txtAuthorFilter.text;
+	if (key != null && key.length() > 0) {
+		try {
+			var resultList:XMLList = new XMLList();
+			resultList = list..atom::feed.*::entry.(atom::author.atom::name.indexOf(key) > -1);
+			trace(resultList);
+			return resultList;
+		} catch (error:Error) {
+			// do nothing.
+			log.debug(error.toString());
+		}
+	}
+	return list;
+}
+
+private function applyProjectFilter(param:XMLList):XMLList
+{
+	var list:XMLList = param;
+	var key:String;
+	
+	if (list == null || list[0] == null) {
+		return list;
+	}
+	
+	var keyObj:XML = this.cmbProject.selectedItem as XML;
+	var xml:XML = <issues type="array"></issues>;
+	if (keyObj != null && keyObj.name != "All") {
+		xml.@redmineId = keyObj.@redmineId;
+		xml.@redmineName = keyObj.@redmineName;
+		key = keyObj.name.text();
+	}
+	
+	if (key != null && key.length > 0) {
+		try {
+			var resultList:XMLList = new XMLList();
+			resultList = list..atom::feed.*::entry.(atom::author.atom::name.indexOf(key) > -1);
+			trace(resultList);
+			return resultList;
+		} catch (error:Error) {
+			// do nothing.
+			log.debug(error.toString());
+		}
+	}
+	return list;
+}
+
+
+/*
 private function applyAuthorFilter(event:Event):void
 {
 	var sourceXML:XML = activityXML.copy();
@@ -447,4 +623,4 @@ private function applyAuthorFilter(event:Event):void
 	}
 	dgActivity.dataProvider = resultList;	
 }
-
+*/

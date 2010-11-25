@@ -2,8 +2,8 @@
 <application xmlns="http://ns.adobe.com/air/application/2.0">
 
     <id>com.appspot.redmineAir</id>
-    <filename>redmineAir</filename>
-    <name>RedmineAir</name>
+    <filename>redmineair</filename>
+    <name>redmineair</name>
     <version>0.0.5</version>
 
     <description>
