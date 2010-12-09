@@ -43,7 +43,7 @@ private var redmineXML:XML = <root/>;
 private var activityXML:XML = <root/>;
 
 [Bindable]
-private var projectXML:XML = <root><projects><project><name>All</name></project></projects></root>;
+private var projectXML:XML = <root><projects><project redmineId="" redmineName=""><name>All</name></project></projects></root>;
 
 public static function get appName(): String 
 {
@@ -87,7 +87,9 @@ private function create(event:Event):void
 		getResult();
 	});
 	btnAbout.addEventListener(MouseEvent.CLICK,goProject);
-	txtAuthorFilter.addEventListener(Event.CHANGE,applyAuthorFilter);
+	txtAuthorFilter.addEventListener(Event.CHANGE,applyFilters);
+	trRedmine.addEventListener(Event.CHANGE, applyFilters);
+	cmbProject.addEventListener(Event.CHANGE, applyFilters);
 	
 	conn = null;
 	var dbFile: File = docRoot.resolvePath(DB_FILE);
@@ -192,6 +194,7 @@ private function loadRedmineSettingHandler(e:SQLEvent):void
 		issueXML = <root/>;
 		activityXML = <root/>;
 		for (var i: int = 0; i < result.data.length; i++) {
+			// this might be handled within a Model class,
 			var target:XML = <redmine/>;
 			target.@id = result.data[i]["id"];
 			target.@name = result.data[i]["name"];
@@ -296,6 +299,7 @@ private function loadProjectComplete(event:ResultEvent):void
 		xml = resultXML.project[i];
 		xml.redmineId = resultXML.@redmineId;
 		xml.redmineName = resultXML.@redmineName;
+		resultXML.project[i] = xml;
 	}
 	this.projectXML.appendChild(resultXML);
 	return;
@@ -323,20 +327,33 @@ private function applyFilters(event:Event): void
 	var p:Object;
 	var reg:RegExp;
 	var event:* = event;
+	var projectTarget:XML;
+	if (event.target.id == "cmbProject") {
+		projectTarget = event.target.selectedItem as XML;
+	}
 	var target:* = this.trRedmine.selectedItem as XML;
 	var aXML:* = this.activityXML.copy();
 	var iXML:* = this.issueXML.copy();
+	var pXML:* = this.projectXML.copy();
 	if (target == null || target.@name == "All") {
 		iList = iXML.children();
 		aList = aXML.atom::feed.entry;
 		pList = iList.issue;
 	} else {
+		var t:XMLListCollection = new XMLListCollection();
+		for (var c:int = 0; c < pXML.projects.length(); c++) {
+			var xml:XML = pXML.projects[c] as XML;
+			if (xml.@redmineId == target.@id) {
+				t.addItem(xml);
+			}
+		}		
+		cmbProject.dataProvider = (t.source).project;
 		var xmlList:XMLList = new XMLList("");
 		iList = iXML.children();
-
-		for (var i:int = 0; i < iXML.issues.length; i++) {
+		trace(iXML.issues);
+		for (var i:int = 0; i < iXML.issues.length(); i++) {
 			var xml:XML = iXML.issues[i] as XML;
-			if (xml.@redmineId == target.@Id) {
+			if (xml.@redmineId == target.@id) {
 				xmlList[i] = xml;
 			}
 		}
@@ -344,17 +361,18 @@ private function applyFilters(event:Event): void
 		var aXmlList:XMLList = new XMLList("");	
 		for (var l:int = 0; l < (aXML.atom::feed as XMLList).length(); l++) {
 			var xml:XML = aXML.atom::feed[l] as XML;
-			if (xml.@redmineId == target.@Id) {
+			if (xml.@redmineId == target.@id) {
 				aXmlList[l] = xml;
 			}
 		}	
 		
 		aList = aXmlList.entry;
 		pList = iList.children();
+		iList = iXML.issues.(@redmineId == target.@id);
 
 	}
 	aList = this.applyAuthorFilter(aList);
-	iList = this.applyProjectFilter(iList);
+	iList = this.applyProjectFilter(iList, projectTarget);
 	var map:Object = new Object();
 	var list: XMLList = pList.project.@name;
 	for (var c:int = 0; c < list.length(); c++) {
@@ -362,7 +380,7 @@ private function applyFilters(event:Event): void
 		reg = new RegExp(child);
 		var n:int = 0;
 		var pl:XMLList = this.projectXML.projects.project;
-		var pXmlList:XMLList = new XMLList("");
+		var pXmlList:XMLList = new XMLList("");n
 		for (var n:int = 0; n < pl.length; n++) {
 			var v:* = pl[n];
 			if (reg.test(v.name)) {
@@ -370,7 +388,7 @@ private function applyFilters(event:Event): void
 			}
 		}
 		o = pXmlList[0];
-		map[child] = o as XML;
+		map[child] = o as XML; 
 	}
 	arry = new ArrayList();
 	arry.addItem(<project><name>All</name></project> as XML);
@@ -378,16 +396,16 @@ private function applyFilters(event:Event): void
 		p = key;
 		arry.addItem(p);
 	}
-	this.cmbProject.dataProvider = arry;
+	//this.cmbProject.dataProvider = arry;
 	iXML = <root/>;
 	iXML.appendChild(iList);
 	this.dgAssigned.dataProvider = iXML.issues.issue;
 	this.dgActivity.dataProvider = aList;
 	
-	if (cmbProject.selectedItem == null) {
+	if (projectTarget == null) {
 		lbIssueCount.text = "All (" + this.dgAssigned.dataProvider.length+ ")";
 	} else {
-		lbIssueCount.text = cmbProject.selectedItem.name + "(" + this.dgAssigned.dataProvider.length+ ")";		
+		lbIssueCount.text =projectTarget.name + "(" + this.dgAssigned.dataProvider.length+ ")";		
 	}
 	// return
 }
@@ -556,12 +574,12 @@ private function applyAuthorFilter(param:XMLList):XMLList
 {
 	var list:XMLList = param;
 	var result:XMLList = list;
-	var key:* = this.txtAuthorFilter.text;
-	if (key != null && key.length() > 0) {
+	var key:String = this.txtAuthorFilter.text;
+	if (key != null && key.length > 0) {
 		try {
 			var resultList:XMLList = new XMLList();
 			resultList = list..atom::feed.*::entry.(atom::author.atom::name.indexOf(key) > -1);
-			trace(resultList);
+			//trace(resultList);
 			return resultList;
 		} catch (error:Error) {
 			// do nothing.
@@ -571,7 +589,7 @@ private function applyAuthorFilter(param:XMLList):XMLList
 	return list;
 }
 
-private function applyProjectFilter(param:XMLList):XMLList
+private function applyProjectFilter(param:XMLList, target:XML):XMLList
 {
 	var list:XMLList = param;
 	var key:String;
@@ -580,22 +598,29 @@ private function applyProjectFilter(param:XMLList):XMLList
 		return list;
 	}
 	
-	var keyObj:XML = this.cmbProject.selectedItem as XML;
+	if (target == null) {
+		return list;
+	}
+	
+	var keyObj:XML = target;
 	var xml:XML = <issues type="array"></issues>;
 	if (keyObj != null && keyObj.name != "All") {
-		xml.@redmineId = keyObj.@redmineId;
-		xml.@redmineName = keyObj.@redmineName;
+		//trace(keyObj.parent());
+		xml.@redmineId = keyObj.parent().@redmineId;
+		xml.@redmineName = keyObj.parent().@redmineName;
 		key = keyObj.name.text();
 	}
 	
 	if (key != null && key.length > 0) {
 		try {
 			var resultList:XMLList = new XMLList();
-			resultList = list..atom::feed.*::entry.(atom::author.atom::name.indexOf(key) > -1);
-			trace(resultList);
-			return resultList;
+			resultList = list.issue.(project.@name == key);
+			//trace(resultList);
+			
+			return new XMLList(xml.appendChild(resultList));
 		} catch (error:Error) {
 			// do nothing.
+			trace(error.toString());
 			log.debug(error.toString());
 		}
 	}

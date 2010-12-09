@@ -7,6 +7,7 @@ package com.appspot.redmineAir.view
 {
 	
 	import com.appspot.redmineAir.util.RedmineEvent;
+	import com.appspot.redmineAir.util.RedmineAirErrorEvent;
 	import com.appspot.redmineAir.util.URLUtils;
 	import com.appspot.redmineAir.view.PopUpWindowViewHelper;
 	
@@ -15,7 +16,7 @@ package com.appspot.redmineAir.view
 	import flash.events.IEventDispatcher;
 	import flash.events.MouseEvent;
 	import flash.filesystem.*;
-		
+	
 	import mx.controls.Alert;
 	import mx.events.CloseEvent;
 	import mx.events.FlexEvent;
@@ -40,6 +41,7 @@ package com.appspot.redmineAir.view
 			if(_logFile.exists) {    
 				_logFile.load();
 				_logFile.addEventListener(Event.COMPLETE,fileLoadCompleteHandler);
+				view.addEventListener(MouseEvent.CLICK, showFileChooser);
 			}
 		}
 		
@@ -54,6 +56,19 @@ package com.appspot.redmineAir.view
 			view.addEventListener(CloseEvent.CLOSE, function(e:Event):void {
 				closePopUp(view);
 			});	
-		}		
+		}
+		
+		private function showFileChooser(event:Event):void 
+		{
+			if (!_logFile) return;
+			
+			try {
+				_logFile.parent.browseForOpen("Open log file.");
+			} catch (e:Error) {
+				// throw custom event (Asks for parent to make alert & logging.)
+				view.dispatchEvent(new RedmineAirErrorEvent(RedmineAirErrorEvent.LOG_ERROR,e.message)); 
+			}
+		}
+		
 	}
 }

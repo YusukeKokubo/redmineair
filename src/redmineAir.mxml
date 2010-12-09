@@ -22,9 +22,9 @@
 	</fx:Declarations>
 	<mx:ApplicationControlBar width="100%" height="30" dock="true" paddingBottom="1" paddingTop="1">
 		<mx:Spacer width="100%" />
-		<mx:Button label="Show Log" id="btnShowLogPanel"/> 		
-		<mx:Button label="Refresh" id="btnRefresh"/> 		
-		<mx:Button label="About" id="btnAbout"/> 
+		<mx:Button label="Show Log" id="btnShowLogPanel" toolTip="Open log window."/> 		
+		<mx:Button label="Refresh" id="btnRefresh" toolTip="Send request to redmine and refresh."/> 		
+		<mx:Button label="About" id="btnAbout" toolTip="Go to project's site."/> 
 	</mx:ApplicationControlBar>
 	<mx:HDividedBox width="100%" height="630" 
 					top="10" bottom="10" left="10" right="10">
@@ -33,7 +33,8 @@
 			<mx:LinkButton id="lbRefresh" width="100%" height="18" label="Refresh list"
 						   color="#26127C" fontStyle="italic" fontWeight="normal" textAlign="right"/>
 			<mx:Tree height="221" width="100%" paddingTop="2" id="trRedmine" itemRenderer="com.appspot.redmineAir.view.RedmineTreeItemRenderer"
-					 dataProvider="{redmineXML}" labelField="@name" change="applyFilters(event)"></mx:Tree>
+					 dataProvider="{redmineXML}" labelField="@name">
+			</mx:Tree>
 			<mx:HBox width="100%" height="25" horizontalAlign="center" horizontalGap="1">
 				<mx:Button id="btnAddRedmine" label="Add" height="20" toolTip="Add Redmine" cornerRadius="2" paddingLeft="2" paddingRight="2" width="40"/>
 				<mx:Button id="btnEditRedmine" label="Edit" height="20" toolTip="Edit Redmine"
@@ -45,7 +46,8 @@
 			</mx:HBox>
 			
 			<mx:Label fontWeight="bold" text="Project List"/>
-			<mx:List id="cmbProject" height="219"  width="100%" dataProvider="{projectXML.projects.project}" labelField="name">	
+			<mx:List id="cmbProject" height="219"  width="100%" dataProvider="{projectXML.projects.project}" 
+					 labelField="name" selectable="true">	
 			</mx:List>
 
 			<mx:LinkButton id="lbShowLogPanel" label="Show log" width="100%" textAlign="right" fontStyle="italic" fontWeight="normal" color="#26127C"/>	
