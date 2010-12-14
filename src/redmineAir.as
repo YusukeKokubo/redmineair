@@ -24,6 +24,7 @@ import mx.rpc.http.HTTPService;
 import mx.utils.*;
 import mx.utils.ObjectUtil;
 
+private static var pattern:RegExp = /\/$/gi;
 private static const log:ILogger = Log.getLogger("main");
 
 static private const DB_FILE: String = "redmineAir.db";
@@ -44,6 +45,9 @@ private var activityXML:XML = <root/>;
 
 [Bindable]
 private var projectXML:XML = <root><projects><project redmineId="" redmineName=""><name>All</name></project></projects></root>;
+
+[Bindable]
+private var targetProject:String;
 
 public static function get appName(): String 
 {
@@ -111,7 +115,6 @@ private function handleExiting(event:Event):void
 	log.info(appName + ": closing");
 }
 
-private static var pattern:RegExp = /\/$/gi;
 public static function correctURL(url:String):String
 {
 	var retval:String = "";
@@ -319,7 +322,6 @@ private function applyFilters(event:Event): void
 {
 	var aList:XMLList;
 	var iList:XMLList;
-	var pList:XMLList;
 	var child:String;
 	var arry:ArrayList;
 	
@@ -331,6 +333,7 @@ private function applyFilters(event:Event): void
 	if (event.target.id == "cmbProject") {
 		projectTarget = event.target.selectedItem as XML;
 	}
+	
 	var target:* = this.trRedmine.selectedItem as XML;
 	var aXML:* = this.activityXML.copy();
 	var iXML:* = this.issueXML.copy();
@@ -338,7 +341,6 @@ private function applyFilters(event:Event): void
 	if (target == null || target.@name == "All") {
 		iList = iXML.children();
 		aList = aXML.atom::feed.entry;
-		pList = iList.issue;
 	} else {
 		var t:XMLListCollection = new XMLListCollection();
 		for (var c:int = 0; c < pXML.projects.length(); c++) {
@@ -366,48 +368,17 @@ private function applyFilters(event:Event): void
 			}
 		}	
 		
-		aList = aXmlList.entry;
-		pList = iList.children();
+		aList = aXmlList.atom::entry;
 		iList = iXML.issues.(@redmineId == target.@id);
 
 	}
 	aList = this.applyAuthorFilter(aList);
 	iList = this.applyProjectFilter(iList, projectTarget);
-	var map:Object = new Object();
-	var list: XMLList = pList.project.@name;
-	for (var c:int = 0; c < list.length(); c++) {
-		child = list[i];
-		reg = new RegExp(child);
-		var n:int = 0;
-		var pl:XMLList = this.projectXML.projects.project;
-		var pXmlList:XMLList = new XMLList("");n
-		for (var n:int = 0; n < pl.length; n++) {
-			var v:* = pl[n];
-			if (reg.test(v.name)) {
-				pXmlList[n] = v;
-			}
-		}
-		o = pXmlList[0];
-		map[child] = o as XML; 
-	}
-	arry = new ArrayList();
-	arry.addItem(<project><name>All</name></project> as XML);
-	for (var key:Object in map) {
-		p = key;
-		arry.addItem(p);
-	}
-	//this.cmbProject.dataProvider = arry;
+
 	iXML = <root/>;
 	iXML.appendChild(iList);
 	this.dgAssigned.dataProvider = iXML.issues.issue;
 	this.dgActivity.dataProvider = aList;
-	
-	if (projectTarget == null) {
-		lbIssueCount.text = "All (" + this.dgAssigned.dataProvider.length+ ")";
-	} else {
-		lbIssueCount.text =projectTarget.name + "(" + this.dgAssigned.dataProvider.length+ ")";		
-	}
-	// return
 }
 
 private function applyFilter(event:Event): void 
@@ -577,10 +548,14 @@ private function applyAuthorFilter(param:XMLList):XMLList
 	var key:String = this.txtAuthorFilter.text;
 	if (key != null && key.length > 0) {
 		try {
-			var resultList:XMLList = new XMLList();
-			resultList = list..atom::feed.*::entry.(atom::author.atom::name.indexOf(key) > -1);
-			//trace(resultList);
-			return resultList;
+			var resultList:XMLListCollection = new XMLListCollection();
+			for (var i:int = 0; i<list.length(); i++) {
+				var xml:XML = list[i] as XML;
+				if (xml.(*::author.atom::name.indexOf(key)) > -1) {
+					resultList.addItem(xml);
+				}
+			}
+			return resultList.source;
 		} catch (error:Error) {
 			// do nothing.
 			log.debug(error.toString());
@@ -605,7 +580,6 @@ private function applyProjectFilter(param:XMLList, target:XML):XMLList
 	var keyObj:XML = target;
 	var xml:XML = <issues type="array"></issues>;
 	if (keyObj != null && keyObj.name != "All") {
-		//trace(keyObj.parent());
 		xml.@redmineId = keyObj.parent().@redmineId;
 		xml.@redmineName = keyObj.parent().@redmineName;
 		key = keyObj.name.text();
@@ -615,37 +589,12 @@ private function applyProjectFilter(param:XMLList, target:XML):XMLList
 		try {
 			var resultList:XMLList = new XMLList();
 			resultList = list.issue.(project.@name == key);
-			//trace(resultList);
-			
 			return new XMLList(xml.appendChild(resultList));
 		} catch (error:Error) {
 			// do nothing.
-			trace(error.toString());
 			log.debug(error.toString());
 		}
 	}
 	return list;
 }
 
-
-/*
-private function applyAuthorFilter(event:Event):void
-{
-	var sourceXML:XML = activityXML.copy();
-	var key:String = txtAuthorFilter.text;
-	var resultList:XMLList = new XMLList();
-	var x:XMLList = sourceXML.atom::feed.*::entry.atom::author.atom::name;
-	if (x != null && x.length() > 0) {
-		try {
-			resultList = sourceXML..atom::feed.*::entry.(atom::author.atom::name.indexOf(key) > -1);
-			trace(resultList);
-		} catch (error:Error) {
-			// do nothing.
-			log.debug(error.toString());
-		}
-	} else {
-		// do nothing.
-	}
-	dgActivity.dataProvider = resultList;	
-}
-*/

@@ -33,7 +33,7 @@
 			<mx:LinkButton id="lbRefresh" width="100%" height="18" label="Refresh list"
 						   color="#26127C" fontStyle="italic" fontWeight="normal" textAlign="right"/>
 			<mx:Tree height="221" width="100%" paddingTop="2" id="trRedmine" itemRenderer="com.appspot.redmineAir.view.RedmineTreeItemRenderer"
-					 dataProvider="{redmineXML}" labelField="@name">
+					 dataProvider="{redmineXML}" labelField="@name" allowMultipleSelection="true">
 			</mx:Tree>
 			<mx:HBox width="100%" height="25" horizontalAlign="center" horizontalGap="1">
 				<mx:Button id="btnAddRedmine" label="Add" height="20" toolTip="Add Redmine" cornerRadius="2" paddingLeft="2" paddingRight="2" width="40"/>
@@ -47,7 +47,7 @@
 			
 			<mx:Label fontWeight="bold" text="Project List"/>
 			<mx:List id="cmbProject" height="219"  width="100%" dataProvider="{projectXML.projects.project}" 
-					 labelField="name" selectable="true">	
+					 labelField="name" selectable="true" allowMultipleSelection="false">	
 			</mx:List>
 
 			<mx:LinkButton id="lbShowLogPanel" label="Show log" width="100%" textAlign="right" fontStyle="italic" fontWeight="normal" color="#26127C"/>	
@@ -59,7 +59,7 @@
 					<mx:Form x="14" width="452" height="30" paddingBottom="1" paddingTop="1"
 							 verticalGap="0" paddingLeft="0">
 						<mx:FormItem label="Issues: " direction="horizontal" height="24" horizontalAlign="left" toolTip="Fliter activities by author name.">
-							<mx:Label id="lbIssueCount" width="120"/> 
+							<mx:Label id="lbIssueCount" width="54" text="{this.dgAssigned.dataProvider.length}"/>
 						</mx:FormItem>
 					</mx:Form>					
 					<mx:DataGrid id="dgAssigned" width="95%" height="230" change="showIssueInfo(event)" 
