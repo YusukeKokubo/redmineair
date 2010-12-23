@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mx:Window showTitleBar="false" visible="true" minWidth="210" transparent="true" 
+	horizontalScrollPolicy="off" borderStyle="solid" borderColor="#f5f5f5"
+	showStatusBar="false" creationPolicy="all" type="lightweight" 
+	windowResize="resizeMe(event);" paddingBottom="0" showGripper="true" 
+	paddingLeft="0" creationComplete="init()" showFlexChrome="true" 
+	verticalGap="2" systemChrome="none" paddingTop="0" alwaysInFront="true" 
+	verticalScrollPolicy="off" minHeight="60" horizontalGap="3" 
+	layout="vertical" xmlns:mx="library://ns.adobe.com/flex/mx" 
+	backgroundAlpha="0" paddingRight="0" width="300" height="200" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:fx="http://ns.adobe.com/mxml/2009">
+<fx:Metadata>
+	[ResourceBundle("messages")]
+</fx:Metadata><fx:Script>
+		<![CDATA[
+			import com.appspot.redmineAir.util.IconSet;
+			import flash.events.*;
+			import mx.events.ResizeEvent;
+			
+			[Bindable]
+			public var textColor:String = "0x000000";
+
+			private function init():void 
+			{
+				panel.width = stage.nativeWindow.width;
+				panel.height = stage.nativeWindow.height;
+				trace("Window opened! " + panel.height);
+				//panel.addEventListener(Event.RESIZE, resizeMe);
+			}
+
+			private function moveWindow(event:MouseEvent):void 
+			{                        
+				stage.nativeWindow.startMove();                
+			}
+
+			private function resizeMe(event:Event):void
+			{
+				panel.width = stage.nativeWindow.width;
+				panel.height = stage.nativeWindow.height;
+			}
+		]]>
+	</fx:Script>
+<mx:VBox borderStyle="none" mouseDown="moveWindow(event)" visible="true" id="panel" horizontalScrollPolicy="off" verticalGap="3" horizontalAlign="center" verticalScrollPolicy="off" horizontalGap="4" x="0" y="0" width="140" height="70">
+<mx:HBox borderStyle="none" paddingLeft="8" paddingRight="10" visible="true" verticalAlign="middle" horizontalAlign="right" width="100%" height="20">
+<mx:Label truncateToFit="true" id="lbIssueTitle" fontSize="10" height="16" width="{panel.width - 60}" color="{textColor}" paddingLeft="6"/>
+<mx:Image id="iconDueDate" source="{com.appspot.redmineAir.util.IconSet.dateIcon}" 
+	visible="{iconDueDate.toolTip == null ? false : true}"
+	height="16" width="18"/>
+<mx:LinkButton id="btnFormat" icon="{com.appspot.redmineAir.util.IconSet.xmlIcon}" 
+	height="16" width="18" toolTip="Show XML"/>
+</mx:HBox>
+<mx:HRule width="100%"  strokeWidth="1" strokeColor="#f5f5f5"/>
+<mx:TextArea visible="true" id="txtIssueHeader" toolTip="{resourceManager.getString('messages', 'tips_issue_header')}" horizontalScrollPolicy="off" verticalScrollPolicy="off" 
+	editable="false" width="100%" height="70" borderStyle="none"
+    color="{textColor}" backgroundAlpha="0"/>
+<mx:TextArea id="txtIssueBody" backgroundAlpha="0" borderStyle="none" focusThickness="0" text="Issue Body" width="100%" height="{panel.height - 100}" verticalScrollPolicy="off" color="{textColor}"/>
+</mx:VBox>
+</mx:Window>
