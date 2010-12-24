@@ -126,7 +126,7 @@
 		</junitreport>
 	</target>	
 
-	<target name="package" depends="test">
+	<target name="package" depends="compile">
 		<java jar="${ADT.JAR}" fork="true" failonerror="true">
 			<arg value="-package"/>
 			<arg value="-storetype"/>
