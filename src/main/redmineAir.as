@@ -2,6 +2,7 @@
 import com.adobe.air.logging.FileTarget;
 import com.appspot.redmineAir.model.Sticky;
 import com.appspot.redmineAir.model.StickyProperties;
+import com.appspot.redmineAir.util.FileIO;
 import com.appspot.redmineAir.util.RedmineEvent;
 import com.appspot.redmineAir.util.URLUtils;
 import com.appspot.redmineAir.view.LogWindow;
@@ -15,19 +16,21 @@ import flash.utils.*;
 import mx.collections.ArrayList;
 import mx.collections.XMLListCollection;
 import mx.controls.Alert;
+import mx.core.BitmapAsset;
 import mx.events.CloseEvent;
 import mx.logging.ILogger;
 import mx.logging.Log;
 import mx.logging.LogEventLevel;
 import mx.managers.PopUpManager;
+import mx.resources.ResourceManager;
 import mx.rpc.AsyncToken;
 import mx.rpc.events.FaultEvent;
 import mx.rpc.events.ResultEvent;
 import mx.rpc.http.HTTPService;
 import mx.utils.*;
 import mx.utils.ObjectUtil;
-import mx.resources.ResourceManager;
 
+private var initializeSucessed:Boolean = false;
 private static var pattern:RegExp = /\/$/gi;
 private static const log:ILogger = Log.getLogger("main");
 
@@ -38,6 +41,7 @@ private var saveRedmineWindow:SaveRedmineWindow;
 private var atom:Namespace = new Namespace("http://www.w3.org/2005/Atom");
 private var logFile:File;
 private var stickies:Object = {};
+private var stickiesDir:File;
 
 [Bindable]
 private var issueXML:XML = <root/>;
@@ -56,6 +60,16 @@ private var targetProject:String;
 
 private var bundleName:String = "messages";
 
+[Embed(source="icons/icon_016.png")]
+private static var icon016:Class;
+[Embed(source="icons/icon_032.png")]
+private static var icon032:Class;
+[Embed(source="icons/icon_128.png")]
+private static var icon128:Class;
+
+private var menuChangeViewMode:ContextMenuItem;
+private var menuExit:NativeMenuItem;
+
 public static function get appName(): String 
 {
 	var ns: Namespace = getDescriptorNamespace();
@@ -67,8 +81,49 @@ static private function getDescriptorNamespace(): Namespace
 	return NativeApplication.nativeApplication.applicationDescriptor.namespace();
 }
 
-private function create(event:Event):void 
+private function create(event:Event):void
 {
+	
+	registerClassAlias("com.appspot.redmineAir.model.Sticky", Sticky);
+	registerClassAlias("com.appspot.redmineAir.model.StickyProperties", StickyProperties);
+	registerClassAlias("flash.geom.Rectangle", Rectangle);
+	registerClassAlias("flash.geom.Point", Point);
+
+	// タスクトレイに常駐化
+	var menu:NativeMenu = new NativeMenu();
+	menuExit = new NativeMenuItem(translate("label_exit"));
+	// Switch show/hide all Stickies.
+	menuChangeViewMode = new ContextMenuItem(translate("label_hide_all"));
+	menuChangeViewMode.addEventListener(Event.SELECT,
+		function(e:Event):void {
+			e.target.checked = !e.target.checked;
+			// hide all
+			for each (var item:Sticky in stickies)
+			{
+				item.windowVisible(!e.target.checked);
+			}
+		});	
+	menu.addItem(menuChangeViewMode);	
+	menuExit.addEventListener(Event.SELECT, appExit);
+	menu.addItem(menuExit);	
+
+	if (NativeApplication.supportsMenu) {
+		var doc:DockIcon = NativeApplication.nativeApplication.icon as DockIcon;
+		var icon:BitmapData = (new icon128() as BitmapAsset).bitmapData;
+		doc.bitmaps = [icon];
+		doc.menu = menu;
+		NativeApplication.nativeApplication.addEventListener(InvokeEvent.INVOKE, systemTrayIconClickHandler);
+		stage.nativeWindow.addEventListener(Event.CLOSE, appExit);
+	} else {
+		var tray:SystemTrayIcon = NativeApplication.nativeApplication.icon as SystemTrayIcon;
+		var icon032:BitmapData = (new icon032() as BitmapAsset).bitmapData;
+		var icon016:BitmapData = (new icon016() as BitmapAsset).bitmapData;
+		tray.bitmaps = [icon032, icon016];
+		tray.menu = menu;
+		tray.tooltip = "RedmineAir";
+		tray.addEventListener(MouseEvent.CLICK, systemTrayIconClickHandler);
+	}
+	
 	var docRoot: File = File.documentsDirectory.resolvePath(appName);
 	docRoot.createDirectory();
 	var oldLogFile: File;
@@ -85,6 +140,19 @@ private function create(event:Event):void
 	}
 	initLog();
 	log.info(appName + ": starting");
+	
+	//-----------------------------------------------
+	stickiesDir = docRoot.resolvePath("stickies");
+	if (stickiesDir.exists) {
+		for each (var f:File in stickiesDir.getDirectoryListing()) {
+			if (f.isDirectory) continue;
+			var s:Sticky = FileIO.readObject(f) as Sticky;
+			var item:XML = s.issue;			
+			stickies[item.@redmineId  + "-" + item.id] = s;
+			s.activate();
+		}
+	}
+	initializeSucessed = true;
 	
 	btnAddRedmine.addEventListener(MouseEvent.CLICK,showSavePanel);
 	btnEditRedmine.addEventListener(MouseEvent.CLICK,showSavePanel);
@@ -194,6 +262,12 @@ private function initStickyDB():void
 	stmt.execute();
 }
 
+// load Stikies
+private function loadStickes():void
+{
+	getStickies();
+}
+
 private function loadRedmineSetting():void 
 {
 	getResult();
@@ -210,6 +284,31 @@ private function getResult():void
 	stmt.sqlConnection = conn;
 	stmt.text = "SELECT id, url, key, feedkey, name, lastAccessed, note FROM redmine_settings";
 	stmt.execute();	
+}
+
+private function getStickies():void
+{	
+	stmt = new SQLStatement();
+	stmt.addEventListener(SQLEvent.RESULT, loadStickesHandler);
+	stmt.addEventListener(SQLErrorEvent.ERROR,
+		function(event:SQLErrorEvent):void {
+			log.error("Couldn't read from target table / stickies: " + event.target.details);
+		});
+	stmt.sqlConnection = conn;
+	stmt.text = "SELECT id, redmine_id, key, url, content, note, lastAccessed FROM stickies";
+	stmt.execute();	
+}
+
+private function loadStickesHandler(e:SQLEvent):void 
+{
+	var result:SQLResult = stmt.getResult();
+	if(result.data != null) {
+		// clear up
+		for (var i: int = 0; i < result.data.length; i++) {
+			var s:Sticky = new Sticky(result.data[i]["url"], result.data[i]["key"], result.data[i]["content"] as XML);
+			s.show();			
+		}
+	}
 }
 
 private function loadRedmineSettingHandler(e:SQLEvent):void 
@@ -630,14 +729,15 @@ public function itemSelect(item: XML):void
 {
 	var id:String = item.id;
 	var redmine:XML = redmineXML.redmine.(@id == item.parent().@redmineId)[0];
+	item.@redmineId = item.parent().@redmineId;
 	var url:String = URLUtils.correctURL(redmine.@url) + "/issues/" + item.id;
 	trace("IssueId: " + id);
-	var s:Sticky = stickies[id];
-	
+		
+	var s:Sticky = stickies[item.@redmineId + "-" + item.id];
 	if (s == null || s.closed) {
 		s = new Sticky(url, item.text, item as XML);
 		s.show();
-		stickies[id] = s;
+		stickies[item.@redmineId  + "-" + item.id] = s;
 	} else {
 		s.activate();
 	}
@@ -657,4 +757,51 @@ private function translate(key:String):String
 		return resourceManager.getString(bundleName, key);
 	}
 	return "";	
+}
+
+private function saveStickies():void
+{
+	if (stickiesDir.exists) stickiesDir.deleteDirectory(true);
+	stickiesDir.createDirectory();
+	
+	for each (var s:Sticky in stickies) {
+		if (s.closed) {
+			continue;
+		}
+		s.setPerment();
+		var item:XML = s.issue;
+		var f:File = stickiesDir.resolvePath(item.@redmineId + "-" + s.issueId + ".dat");
+		FileIO.writeObject(f, s);
+		s.close();
+	}
+}
+
+private function appExit(e:Event):void
+{
+	stage.nativeWindow.removeEventListener(Event.CLOSE, appExit);
+	saveStickies();
+	NativeApplication.nativeApplication.exit();
+}
+
+public function onWindowClosing(e:Event):void
+{
+	if (!initializeSucessed) {
+		return;
+	}
+	// windowをcloseしてもアプリを終了しない
+	visible = false;
+	e.preventDefault();
+}
+
+private function systemTrayIconClickHandler(event:Event) :void 
+{
+	if (!visible || nativeWindow.displayState == NativeWindowDisplayState.MINIMIZED) {
+		if (!nativeWindow.visible) {
+			nativeWindow.visible = true;
+		}
+		visible = true;
+		nativeWindow.restore();
+		activate();
+		setFocus();
+	}
 }

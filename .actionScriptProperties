@@ -18,7 +18,11 @@
     <sourceAttachmentPath/>
   </compiler>
   <theme themeIsDefault="false" themeIsSDK="true" themeLocation="${SDK_THEMES_DIR}/frameworks/themes/Halo"/>
-  <applications/>
+  <applications>
+    <application path="redmineAir.mxml">
+      <airExcludes/>
+    </application>
+  </applications>
   <modules/>
   <buildCSSFiles/>
   <flashCatalyst validateFlashCatalystCompatibility="false"/>
