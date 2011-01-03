@@ -7,6 +7,7 @@
 		<![CDATA[
 			[Bindable]
 			public var issue:XML;
+			private var ra:Namespace = new Namespace("http://com.appspot.redmineAir/redmineAir")
 
 			// override setter 
 			override public function set data(value:Object):void
@@ -16,6 +17,6 @@
 			}
 		]]>
 	</fx:Script>
-<mx:Label text="{data.parent().@redmineName}">
+<mx:Label text="{data.parent().ra::redmineName}">
 </mx:Label>
 </s:MXDataGridItemRenderer>

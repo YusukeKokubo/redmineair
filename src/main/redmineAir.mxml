@@ -2,6 +2,7 @@
 <s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009" 
 					xmlns:s="library://ns.adobe.com/flex/spark" 
 					xmlns:mx="library://ns.adobe.com/flex/mx"
+					xmlns:util="com.appspot.redmineAir.util.*"
 				    width="700" height="650"
 					applicationComplete="create(event)" initialize="onInitialize(event)"
 					visible="true" maxWidth="900" maxHeight="850"
@@ -64,7 +65,7 @@
 							<mx:Label id="lbIssueCount" width="54" text="{this.dgAssigned.dataProvider.length}"/>
 						</mx:FormItem>
 					</mx:Form>					
-					<mx:DataGrid id="dgAssigned" width="95%" height="230" change="showIssueInfo(event)" 
+					<mx:DataGrid id="dgAssigned" width="95%" height="284" change="showIssueInfo(event)" 
 								 dataProvider="{issueXML.issues.issue}" horizontalScrollPolicy="auto" verticalScrollPolicy="auto">
 						<mx:columns>
 							<mx:DataGridColumn width="28" headerText="" paddingLeft="0"
@@ -79,11 +80,11 @@
 						</mx:columns>
 						
 					</mx:DataGrid>
-					<mx:Panel width="100%" height="290" title="{'Subject: ' + dgAssigned.selectedItem.subject.substring(0, 40) + '...'}"
+					<mx:Panel width="100%" height="231" title="{'Subject: ' + dgAssigned.selectedItem.subject.substring(0, 40) + '...'}"
 							  paddingTop="4" paddingBottom="4"
 							  paddingLeft="4" paddingRight="4"
 							  styleName="Panel01">
-						<mx:TextArea width="100%" height="236" id="txtIssueDetail" 
+						<mx:TextArea width="100%" height="186" id="txtIssueDetail" 
 									 styleName="TextArea" verticalScrollPolicy="auto"/>
 					</mx:Panel>					
 					<!-- <mx:LinkButton id="lnkIssue" width="95%" height="30"
@@ -116,10 +117,10 @@
 								 styleName="TextArea" verticalScrollPolicy="auto" fontSize="8"/>
 					</mx:Panel>				
 					<mx:LinkButton id="lnkEntry" width="95%" height="30"
-								   click="navigateToURL(new URLRequest(correctURL(dgActivity.selectedItem.atom::id.toString())), 'quote')"
+								   click="navigateToURL(new URLRequest(URLUtils.correctURL(dgActivity.selectedItem.atom::id.toString())), 'quote')"
 								   color="#26127C" fontStyle="italic" fontWeight="normal"
 								   textAlign="right"
-								   toolTip="Goto : {correctURL(dgActivity.selectedItem.atom::id.toString())}"/>
+								   toolTip="Goto : {URLUtils.correctURL(dgActivity.selectedItem.atom::id.toString())}"/>
 					
 				</mx:VBox>								
 			</mx:TabNavigator>

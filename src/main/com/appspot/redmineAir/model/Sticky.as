@@ -2,7 +2,8 @@ package com.appspot.redmineAir.model {
 
     import com.appspot.redmineAir.util.URLUtils;
     import com.appspot.redmineAir.view.StickyWindow;
-
+	import com.appspot.redmineAir.util.RedmineAirErrorEvent;
+    
     import flash.display.*;
     import flash.events.*;
     import flash.geom.*;
@@ -10,12 +11,14 @@ package com.appspot.redmineAir.model {
     import flash.system.*;
     import flash.text.*;
     import flash.ui.*;
-
+    
     import mx.controls.*;
     import mx.events.*;
+    import mx.managers.PopUpManager;
     import mx.rpc.events.ResultEvent;
     import mx.rpc.http.HTTPService;
-    import mx.managers.PopUpManager;
+	import mx.rpc.events.FaultEvent;
+	import mx.utils.ObjectUtil;
 
     [RemoteClass]
     public class Sticky {
@@ -26,7 +29,8 @@ package com.appspot.redmineAir.model {
 
         private var initilized:Boolean = false;
         private var httpService:HTTPService = new HTTPService();
-
+		private var ra:Namespace = new Namespace("http://com.appspot.redmineAir/redmineAir")
+		
         private var menu:ContextMenu = new ContextMenu();
         private var menuToRedmine:ContextMenuItem	= new ContextMenuItem("to Redmine");
         private var menuReload:ContextMenuItem	    = new ContextMenuItem("reload");
@@ -67,8 +71,10 @@ package com.appspot.redmineAir.model {
         public var uri:String;
         public var key:String;
         public var issue:XML;
-        public var prop:StickyProperties;
+        //public var prop:StickyProperties;
         public var isShowXml:Boolean = false;
+		public var updatedOn:Date = null;
+		public var lastAccessed:Date = null;
 
         public static const HIDE_STICKY:String = "hideStickyEvt";
         public static const SHOW_STICKY:String = "showStickyEvt";
@@ -87,11 +93,13 @@ package com.appspot.redmineAir.model {
 
             window.contextMenu = makeMenu();			
 
-            // 付箋情報更新
-            httpService.useProxy = false;
-            httpService.resultFormat = "e4x";
-            httpService.showBusyCursor = true;
-            httpService.addEventListener(ResultEvent.RESULT, reload);
+			// 付箋情報更新
+			httpService.useProxy = false;
+			httpService.resultFormat = "e4x";
+			httpService.showBusyCursor = true;
+			httpService.addEventListener(ResultEvent.RESULT, reload);
+			httpService.addEventListener(FaultEvent.FAULT, ioErrorHandler);			
+			
         } // end of function Sticky
 
         private function makeMenu():ContextMenu {
@@ -101,7 +109,7 @@ package com.appspot.redmineAir.model {
                 });
             menuReload.addEventListener(Event.SELECT,
                 function():void {
-                    httpService.url = uri + "/issues/" + issue.id + ".xml?key=" + key;
+                    httpService.url = uri + ".xml?key=" + key;
                     httpService.send();
                 });
             menuKeepFront.addEventListener(Event.SELECT,
@@ -216,11 +224,12 @@ package com.appspot.redmineAir.model {
         }
 
         private function init():void {
-            if (prop != null) {
+            /*if (prop != null) {
                 prop.setup(window);
             } else {
                 prop = new StickyProperties();
             }
+			*/
             showText();
             menuKeepFront.checked = window.alwaysInFront;
             initilized = true;
@@ -236,6 +245,7 @@ package com.appspot.redmineAir.model {
             window.txtIssueHeader.text = 
                 "Project : " + issue.project.@name + "\n" +
                 "Subject : " + issue.subject + "\n" +
+				"RedmineId : " +  issue.ra::redmineId + "\n" +
                 "DueDate : " + issue.due_date + "\n";
             window.txtIssueHeader.selectable = false;		
             window.txtIssueBody.selectable = false;
@@ -260,7 +270,11 @@ package com.appspot.redmineAir.model {
 
         private function reload(event:ResultEvent):void 
         {
-            issue = event.result as XML;
+			lastAccessed = new Date();
+			var updatedIssue:XML = event.result as XML;
+			updatedIssue.ra::redmineId = issue.ra::redmineId;
+			updatedIssue.ra::lastAccessed = lastAccessed.toString();
+			issue = updatedIssue;
             showText();
         }
 
@@ -293,7 +307,8 @@ package com.appspot.redmineAir.model {
 
         public function setPerment():void 
         {
-            prop.teardown(window);
+            //prop.teardown(window);
+			this.updatedOn = new Date();
         }
 
         //yyyy-mm-dd形式をDate型にする
@@ -320,6 +335,12 @@ package com.appspot.redmineAir.model {
                 return true;
             return false;	
         }
+		
+		private function ioErrorHandler(event:FaultEvent):void
+		{
+			Alert.show(ObjectUtil.toString(event.fault),"Error");
+			window.dispatchEvent((new RedmineAirErrorEvent(RedmineAirErrorEvent.HTTP_ERROR,event.message.toString())));			
+		}		
 
     } // end of class Sticky		
 }

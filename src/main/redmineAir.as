@@ -7,10 +7,12 @@ import com.appspot.redmineAir.util.RedmineEvent;
 import com.appspot.redmineAir.util.URLUtils;
 import com.appspot.redmineAir.view.LogWindow;
 import com.appspot.redmineAir.view.SaveRedmineWindow;
+import com.appspot.redmineAir.util.RedmineAirErrorEvent;
 
 import flash.events.Event;
 import flash.events.MouseEvent;
 import flash.filesystem.File;
+import flash.geom.Rectangle;
 import flash.utils.*;
 
 import mx.collections.ArrayList;
@@ -39,9 +41,10 @@ private var conn: SQLConnection;
 private var stmt:SQLStatement;
 private var saveRedmineWindow:SaveRedmineWindow;
 private var atom:Namespace = new Namespace("http://www.w3.org/2005/Atom");
+private var ra:Namespace = new Namespace("http://com.appspot.redmineAir/redmineAir")
 private var logFile:File;
 private var stickies:Object = {};
-private var stickiesDir:File;
+//private var stickiesDir:File;
 
 [Bindable]
 private var issueXML:XML = <root/>;
@@ -141,17 +144,6 @@ private function create(event:Event):void
 	initLog();
 	log.info(appName + ": starting");
 	
-	//-----------------------------------------------
-	stickiesDir = docRoot.resolvePath("stickies");
-	if (stickiesDir.exists) {
-		for each (var f:File in stickiesDir.getDirectoryListing()) {
-			if (f.isDirectory) continue;
-			var s:Sticky = FileIO.readObject(f) as Sticky;
-			var item:XML = s.issue;			
-			stickies[item.@redmineId  + "-" + item.id] = s;
-			s.activate();
-		}
-	}
 	initializeSucessed = true;
 	
 	btnAddRedmine.addEventListener(MouseEvent.CLICK,showSavePanel);
@@ -190,17 +182,6 @@ private function handleExiting(event:Event):void
 	log.info(appName + ": closing");
 }
 
-public static function correctURL(url:String):String
-{
-	var retval:String = "";
-	try {
-		retval = url.replace(pattern, "");
-	} catch (e:Error) {
-		retval = "";	
-	}
-	return retval;		
-}
-
 private function initLog():void
 {
 	var docRoot: File = File.documentsDirectory.resolvePath(appName);
@@ -219,6 +200,7 @@ private function connectionOpenHandler(event: SQLEvent):void
 	log.info("DB connection Open: " + DB_FILE);
 	initSettingDB();
 	initStickyDB();
+	loadStickes();
 	loadRedmineSetting();
 }
 
@@ -251,12 +233,21 @@ private function initStickyDB():void
 	stmt.text =
 		"CREATE TABLE IF NOT EXISTS stickies (" + 
 		"    id int, " +
-		"    redmine_id int, " +
+		"    redmine_id INTEGER, " +
 		"    key TEXT," + 
 		"    url TEXT," + 
-		"    content TEXT," +
+		"    content XML," +
 		"    note TEXT," + 
 		"    lastAccessed DATETIME," +
+		"    alwaysInFront BOOLEAN," +
+		"    point_x INTEGER," + 
+		"    point_y INTEGER," + 		
+		"    width INTEGER," +
+		"    height INTEGER," +
+		"    alpha INTEGER," +
+		"    textColor TEXT," +
+		"    backgroundColor TEXT," +
+		"    updatedOn DATETIME," +
 		"    PRIMARY KEY(id, redmine_id)" + 
 		")";
 	stmt.execute();
@@ -295,7 +286,9 @@ private function getStickies():void
 			log.error("Couldn't read from target table / stickies: " + event.target.details);
 		});
 	stmt.sqlConnection = conn;
-	stmt.text = "SELECT id, redmine_id, key, url, content, note, lastAccessed FROM stickies";
+	stmt.text = "SELECT id, redmine_id, key, url, content, note, lastAccessed, "
+			+ " alwaysInFront, point_x, point_y, width, height, textColor, "
+			+ " backgroundColor, alpha, updatedOn FROM stickies";
 	stmt.execute();	
 }
 
@@ -305,8 +298,19 @@ private function loadStickesHandler(e:SQLEvent):void
 	if(result.data != null) {
 		// clear up
 		for (var i: int = 0; i < result.data.length; i++) {
-			var s:Sticky = new Sticky(result.data[i]["url"], result.data[i]["key"], result.data[i]["content"] as XML);
-			s.show();			
+			var data:Object = result.data[i];
+			var s:Sticky = new Sticky(data["url"], data["key"], data["content"] as XML);
+			s.window.panel.alpha = data["alpha"];
+			s.window.textColor = data["textColor"];
+			s.window.alwaysInFront = data["alwaysInFront"];
+			s.window.stage.nativeWindow.bounds = new Rectangle(data["point_x"], data["point_y"], data["width"], data["height"]);
+			s.window.width = data["width"];
+			s.window.height = data["height"];
+			s.window.addEventListener(RedmineAirErrorEvent.HTTP_ERROR, errorLogging);
+			s.updatedOn = new Date(data["updatedOn"].toString());
+			s.lastAccessed = new Date(data["lastAccessed"].toString());
+			stickies[s.issue.ra::redmineId  + "-" + s.issueId] = s;
+			s.activate();			
 		}
 	}
 }
@@ -344,7 +348,7 @@ private function loadRedmineSettingHandler(e:SQLEvent):void
 			requestStr = requestStr + "issues.xml?assigned_to_id=me";
 			if (result.data[i]["key"] != null && result.data[i]["key"].length > 0)
 				requestStr = requestStr + "&key=" + result.data[i]["key"]
-			httpService.url = correctURL(requestStr);
+			httpService.url = URLUtils.correctURL(requestStr);
 			var at:AsyncToken = httpService.send()
 			at.redmineId = result.data[i]["id"];
 			at.redmineName = result.data[i]["name"];
@@ -359,7 +363,7 @@ private function loadRedmineSettingHandler(e:SQLEvent):void
 			rs = rs + "activity.atom";
 			if (result.data[i]["feedkey"] != null && result.data[i]["feedkey"].length > 0)
 				rs = rs + "?key=" + result.data[i]["feedkey"]
-			feedService.url = correctURL(rs);
+			feedService.url = URLUtils.correctURL(rs);
 			var fd:AsyncToken = feedService.send()
 			fd.redmineId = result.data[i]["id"];
 			fd.redmineName = result.data[i]["name"];
@@ -374,7 +378,7 @@ private function loadRedmineSettingHandler(e:SQLEvent):void
 			projectRs = projectRs + "projects.xml?";
 			if (result.data[i]["key"] != null && result.data[i]["key"].length > 0)
 				projectRs =projectRs + "&key=" + result.data[i]["key"]
-			projectService.url = correctURL(projectRs);
+			projectService.url = URLUtils.correctURL(projectRs);
 			var pt:AsyncToken = projectService.send()
 			pt.redmineId = result.data[i]["id"];
 			pt.redmineName = result.data[i]["name"];
@@ -388,6 +392,7 @@ private function loadRedmineSettingHandler(e:SQLEvent):void
 		vdRedmineData.enabled = false;
 	}
 }
+
 private function treeInit():void
 {
 	var TreeCollection:XMLListCollection = new XMLListCollection (new XMLList (redmineXML)); 
@@ -397,10 +402,11 @@ private function treeInit():void
 private function loadComplete(event:ResultEvent):void
 {
 	var resultXML:XML = event.target.lastResult as XML;
-	resultXML.@redmineId = event.token.redmineId.toString();
-	resultXML.@redmineName = event.token.redmineName.toString();
+	resultXML.ra::redmineId = event.token.redmineId.toString();
+	resultXML.ra::redmineName = event.token.redmineName.toString();
+	resultXML.ra::lastAccessed = new Date();
 	redmineXML.redmine.(@id == event.token.redmineId).@hasError = 0;
-	var xml:XML;
+	
 	issueXML.appendChild(resultXML);
 }
 
@@ -408,8 +414,9 @@ private function loadFeedComplete(event:ResultEvent):void
 {
 	var resultXML:XML = event.target.lastResult as XML;
 	atom = resultXML.namespace();
-	resultXML.@redmineId = event.token.redmineId.toString();
-	resultXML.@redmineName = event.token.redmineName.toString();
+	resultXML.ra::redmineId = event.token.redmineId.toString();
+	resultXML.ra::redmineName = event.token.redmineName.toString();
+	resultXML.ra::lastAccessed = new Date();
 	
 	activityXML.appendChild(resultXML);
 }
@@ -420,16 +427,19 @@ private function loadProjectComplete(event:ResultEvent):void
 	var xml:XML;
 	var event:* = event;
 	log.info(resultXML);
+	
 	resultXML = event.target.lastResult as XML;
-	resultXML.@redmineId = event.token.redmineId.toString();
-	resultXML.@redmineName = event.token.redmineName.toString();
+	resultXML.ra::redmineId = event.token.redmineId.toString();
+	resultXML.ra::redmineName = event.token.redmineName.toString();
 	
 	for (var i:int = 0; i < resultXML.project.length; i++) {
 		xml = resultXML.project[i];
-		xml.redmineId = resultXML.@redmineId;
-		xml.redmineName = resultXML.@redmineName;
+		xml.ra::redmineId = resultXML.ra::redmineId;
+		xml.ra::redmineName = resultXML.ra::redmineName;
+		
 		resultXML.project[i] = xml;
 	}
+	
 	this.projectXML.appendChild(resultXML);
 	return;
 }
@@ -472,31 +482,30 @@ private function applyFilters(event:Event): void
 		var xml:XML;
 		for (var c:int = 0; c < pXML.projects.length(); c++) {
 			xml = pXML.projects[c] as XML;
-			if (xml.@redmineId == target.@id) {
+			if (xml.ra::redmineId == target.@id) {
 				t.addItem(xml);
-			}
+			}			
 		}		
 		cmbProject.dataProvider = (t.source).project;
 		var xmlList:XMLList = new XMLList("");
 		iList = iXML.children();
-		trace(iXML.issues);
 		for (var i:int = 0; i < iXML.issues.length(); i++) {
 			xml = iXML.issues[i] as XML;
-			if (xml.@redmineId == target.@id) {
+			if (xml.ra::redmineId == target.@id) {
 				xmlList[i] = xml;
-			}
+			}			
 		}
 		
 		var aXmlList:XMLList = new XMLList("");	
 		for (var l:int = 0; l < (aXML.atom::feed as XMLList).length(); l++) {
 			xml = aXML.atom::feed[l] as XML;
-			if (xml.@redmineId == target.@id) {
+			if (xml.ra::redmineId == target.@id) {
 				aXmlList[l] = xml;
-			}
+			}			
 		}	
 		
 		aList = aXmlList.atom::entry;
-		iList = iXML.issues.(@redmineId == target.@id);
+		iList = iXML.issues.(ra::redmineId == target.@id);
 
 	}
 	aList = this.applyAuthorFilter(aList);
@@ -508,24 +517,6 @@ private function applyFilters(event:Event): void
 	this.dgActivity.dataProvider = aList;
 }
 
-private function applyFilter(event:Event): void 
-{
-	var target:XML = event.target.selectedItem as XML;
-	var aXML:XML = activityXML.copy();
-	var iXML:XML = issueXML.copy();
-	var pList:XMLList;
-	var child:String;
-	
-	if (target.@name == "All") {
-		dgAssigned.dataProvider = iXML.issues.issue;
-		dgActivity.dataProvider = aXML.atom::feed.*::entry;
-		return;
-	}
-	if (target.@id) {
-		dgAssigned.dataProvider = issueXML.issues.(@redmineId == target.@id).issue;
-		dgActivity.dataProvider = activityXML.atom::feed.(@redmineId == target.@id).*::entry;
-	}
-}
 
 private function showSavePanel(event:Event):void
 {
@@ -573,10 +564,10 @@ private function alertListener(event:CloseEvent):void
 {
 	if (event.detail == Alert.OK) {
 		var target:XML = trRedmine.selectedItem as XML;
-		//log.debug("Removed " + target.@name);
+		log.debug("Removed " + target.@name);
 		delete redmineXML.redmine.(@id == target.@id)[0];
-		delete issueXML.issues.(@redmineId == target.@id)[0];
-		delete activityXML.feed.(@redmineId == target.@id)[0];
+		delete issueXML.issues.(ra::redmineId == target.@id)[0];
+		delete activityXML.feed.(ra::redmineId == target.@id)[0];
 		txtIssueDetail.text = null;
 		deleteRedmine(target);
 		getResult();
@@ -613,14 +604,15 @@ public function saveRedmine(event:RedmineEvent):void
 	
 	if (event.type == RedmineEvent.EDIT) {
 		stmt.text =
-			"UPDATE redmine_settings SET url = :url, key = :key, feedkey = :feedkey, name = :name, "
-			+　"note = :note WHERE id = :id";
+			"UPDATE redmine_settings SET url = :url, key = :key, "
+			+ "feedkey = :feedkey, name = :name, "
+			+ "note = :note WHERE id = :id";
 		stmt.parameters[':id'] = target.@id;
 	}
 
 	if (event.type == RedmineEvent.ADD) {
 		stmt.text =
-			"INSERT INTO redmine_settings(url, key, feedkey, name, note) "
+			"INSERT INTO redmine_settings(url, key, feedkey, name) "
 			+ "VALUES (:url, :key, :feedkey, :name, :note)";
 	}
 	log.info(stmt.text);
@@ -631,18 +623,16 @@ public function showIssueInfo(event:Event):void
 {
 	var targetXML:XML = event.target.selectedItem as XML
 	txtIssueDetail.text = targetXML.toString();
-	var redmineId:String = targetXML.parent().@redmineId;
-	log.debug("target1: " + redmineId);
-	
+	var redmineId:String = targetXML.parent().ra::redmineId;
+	log.debug("target1: " + redmineId);	
 	log.debug("target: " + redmineXML.redmine.(@id == redmineId).@name);
-	//lnkIssue.label = correctURL(redmineXML.redmine.(@id == redmineId).@url + "issues/" + targetXML.id);
 }
 
 public function showEntryInfo(event:Event):void 
 {
 	var entryXML:XML = event.target.selectedItem as XML;
 	txtEntryDetail.htmlText = entryXML.*::content.toString();
-	lnkEntry.label = correctURL(entryXML.*::id.toString()).substring(0, 50) + '...';
+	lnkEntry.label = URLUtils.correctURL(entryXML.*::id.toString()).substring(0, 50) + '...';
 }
 
 // for handling xml namespace 
@@ -707,8 +697,8 @@ private function applyProjectFilter(param:XMLList, target:XML):XMLList
 	var keyObj:XML = target;
 	var xml:XML = <issues type="array"></issues>;
 	if (keyObj != null && keyObj.name != "All") {
-		xml.@redmineId = keyObj.parent().@redmineId;
-		xml.@redmineName = keyObj.parent().@redmineName;
+		xml.ra::redmineId = keyObj.parent().ra::redmineId;
+		xml.ra::redmineName = keyObj.parent().ra::redmineName;
 		key = keyObj.name.text();
 	}
 	
@@ -728,16 +718,19 @@ private function applyProjectFilter(param:XMLList, target:XML):XMLList
 public function itemSelect(item: XML):void
 {
 	var id:String = item.id;
-	var redmine:XML = redmineXML.redmine.(@id == item.parent().@redmineId)[0];
-	item.@redmineId = item.parent().@redmineId;
+	var redmine:XML = redmineXML.redmine.(@id == item.parent().ra::redmineId)[0];
+	item.ra::redmineId = item.parent().ra::redmineId;
+	item.ra::lastAccessed = item.parent().ra::lastAccessed;
+	item.@key = redmine.@key;
 	var url:String = URLUtils.correctURL(redmine.@url) + "/issues/" + item.id;
 	trace("IssueId: " + id);
 		
-	var s:Sticky = stickies[item.@redmineId + "-" + item.id];
+	var s:Sticky = stickies[item.ra::redmineId + "-" + item.id];
 	if (s == null || s.closed) {
-		s = new Sticky(url, item.text, item as XML);
-		s.show();
-		stickies[item.@redmineId  + "-" + item.id] = s;
+		s = new Sticky(url, item.@key, item as XML);
+		s.lastAccessed = new Date(item.ra::lastAccessed.toString());
+		s.show();		
+		stickies[item.ra::redmineId  + "-" + item.id] = s;
 	} else {
 		s.activate();
 	}
@@ -759,6 +752,7 @@ private function translate(key:String):String
 	return "";	
 }
 
+/*
 private function saveStickies():void
 {
 	if (stickiesDir.exists) stickiesDir.deleteDirectory(true);
@@ -770,16 +764,92 @@ private function saveStickies():void
 		}
 		s.setPerment();
 		var item:XML = s.issue;
-		var f:File = stickiesDir.resolvePath(item.@redmineId + "-" + s.issueId + ".dat");
+		var f:File = stickiesDir.resolvePath(item.ra::redmineId + "-" + s.issueId + ".dat");
 		FileIO.writeObject(f, s);
 		s.close();
-	}
+	}	
+}
+*/
+
+private function saveStickiesToDB():void
+{
+	
+	stmt = new SQLStatement();
+	stmt.addEventListener(SQLErrorEvent.ERROR,
+		function(event:SQLErrorEvent):void {
+			log.debug("Couldn't insert/update to target table / stickies: " + event.target.details);
+		});	
+	stmt.sqlConnection = conn;
+	
+	var editText:String = "UPDATE stickies SET id = :id, redmine_id = :redmine_id, "
+		+ "key = :key, "
+		+ "url = :url, "
+		+ "content = :content, "
+		+ "alwaysInFront = :alwaysInFront, "
+		+ "alpha = :alpha,"
+		+ "textColor = :textColor,"
+		+ "backgroundColor = :backgroundColor,"
+		+ "updatedOn = datetime('now', 'localtime'), "
+		+ "lastAccessed = :lastAccessed, "		
+		+ "width = :width,"
+		+ "height = :height, "
+		+ "point_x = :point_x, "
+		+ "point_y = :point_y "
+		+ " WHERE id = :id";
+	
+	var insertText:String = "INSERT INTO stickies(id, redmine_id, key, url, content, lastAccessed, "
+		+ "alwaysInFront, alpha, textColor, backgroundColor, updatedOn, height, width, point_x, point_y) "
+		+ "VALUES (:id, :redmine_id, :key, :url, :content, :lastAccessed, "
+		+ ":alwaysInFront, :alpha, :textColor, :backgroundColor, datetime('now', 'localtime'), :height, :width,"
+		+ ":point_x, :point_y)";
+	
+	
+	log.info(stmt.text);
+	
+	// Save SQLite
+	
+	for each (var s:Sticky in stickies){
+		if (s.closed) {
+			deleteStickies(s.issue);
+			continue;
+		}
+		
+		stmt.text = insertText;
+		if (s.updatedOn != null) {
+			stmt.text = editText;
+		}
+		//s.setPerment();
+		
+		s.issue.addNamespace(ra);
+		
+		// parameters
+		stmt.parameters[':url'] = s.uri;
+		stmt.parameters[':key'] = s.key;
+		stmt.parameters[':id'] = s.issueId;
+		stmt.parameters[':redmine_id'] = s.issue.ra::redmineId.text();
+		stmt.parameters[':content'] = s.issue;
+		stmt.parameters[':alwaysInFront'] = s.window.alwaysInFront;
+		stmt.parameters[':alpha'] = s.window.panel.alpha;
+		stmt.parameters[':textColor'] = s.window.textColor;
+		stmt.parameters[':backgroundColor'] = s.window.panel.getStyle("backgroundColor");
+		stmt.parameters[':height'] = s.window.height;
+		stmt.parameters[':width'] = s.window.width;
+		stmt.parameters[':lastAccessed'] = s.lastAccessed;
+		
+		var bounds:Rectangle = s.window.nativeWindow.bounds;
+		stmt.parameters[':point_x'] = bounds.x;
+		stmt.parameters[':point_y'] = bounds.y;		
+		
+		log.info(stmt.text);
+		stmt.execute();	
+	}		
 }
 
 private function appExit(e:Event):void
 {
 	stage.nativeWindow.removeEventListener(Event.CLOSE, appExit);
-	saveStickies();
+	saveStickiesToDB();
+	//saveStickies();
 	NativeApplication.nativeApplication.exit();
 }
 
@@ -805,3 +875,39 @@ private function systemTrayIconClickHandler(event:Event) :void
 		setFocus();
 	}
 }
+
+// Delete stickies object from DB
+private function deleteStickies(target:XML):void
+{
+	stmt = new SQLStatement();
+	stmt.sqlConnection = conn;
+	stmt.text =
+		"DELETE FROM stickies WHERE id = " +  target.id
+			+ " AND redmine_id = " + target.ra::redmineId;
+	log.info(stmt.text);
+	stmt.execute();
+}
+
+public function lpad(original:Object, length:int, pad:String):String
+{
+	var padded:String = original == null ? "" : original.toString();
+	while (padded.length < length) padded = pad + padded;
+	return padded;
+}
+
+public function toSqlDate(dateVal:Date):String
+{
+	return dateVal == null ? null : dateVal.fullYear
+		+ "-" + lpad(dateVal.month + 1,2,'0')  // month is zero-based
+		+ "-" + lpad(dateVal.date,2,'0')
+		+ " " + lpad(dateVal.hours,2,'0')
+		+ ":" + lpad(dateVal.minutes,2,'0')
+		+ ":" + lpad(dateVal.seconds,2,'0')
+		;
+}
+
+public function errorLogging(event:RedmineAirErrorEvent):void 
+{
+	log.error(event.errorMessage);
+}
+
