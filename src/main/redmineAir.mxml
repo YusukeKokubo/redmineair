@@ -65,7 +65,8 @@
 							<mx:Label id="lbIssueCount" width="54" text="{this.dgAssigned.dataProvider.length}"/>
 						</mx:FormItem>
 					</mx:Form>					
-					<mx:DataGrid id="dgAssigned" width="95%" height="284" change="showIssueInfo(event)" 
+					<mx:DataGrid id="dgAssigned" width="95%" height="300" change="displayIssueInfo(event)" showDataTips="true"
+					             dataTipFunction="showIssueInfo"
 								 dataProvider="{issueXML.issues.issue}" horizontalScrollPolicy="auto" verticalScrollPolicy="auto">
 						<mx:columns>
 							<mx:DataGridColumn width="28" headerText="" paddingLeft="0"
@@ -80,13 +81,20 @@
 						</mx:columns>
 						
 					</mx:DataGrid>
-					<mx:Panel width="100%" height="231" title="{'Subject: ' + dgAssigned.selectedItem.subject.substring(0, 40) + '...'}"
-							  paddingTop="4" paddingBottom="4"
+					
+					<mx:Panel width="100%" height="200" title="{'Subject: ' + dgAssigned.selectedItem.subject.substring(0, 40) + '...'}"
+							  paddingTop="2" paddingBottom="2"
 							  paddingLeft="4" paddingRight="4"
 							  styleName="Panel01">
-						<mx:TextArea width="100%" height="186" id="txtIssueDetail" 
+						<mx:HBox borderStyle="none" paddingLeft="8" paddingRight="10" visible="true" verticalAlign="middle" horizontalAlign="right" width="100%" height="20">
+						<mx:LinkButton id="btnFormat" icon="{com.appspot.redmineAir.util.IconSet.xmlIcon}" 
+								height="16" width="18" toolTip="Show XML"/>
+						</mx:HBox>
+							  
+						<mx:TextArea width="100%" height="160" id="txtIssueDetail" 
 									 styleName="TextArea" verticalScrollPolicy="auto"/>
-					</mx:Panel>					
+					</mx:Panel>
+										
 					<!-- <mx:LinkButton id="lnkIssue" width="95%" height="30"
 								   click="navigateToURL(new URLRequest(lnkIssue.label), 'quote')"
 								   color="#26127C" fontStyle="italic" fontWeight="normal"

@@ -162,6 +162,8 @@ private function create(event:Event):void
 	trRedmine.addEventListener(Event.CHANGE, applyFilters);
 	cmbProject.addEventListener(Event.CHANGE, applyFilters);
 	
+	btnFormat.addEventListener(MouseEvent.MOUSE_DOWN,changeFormat);
+	
 	conn = null;
 	var dbFile: File = docRoot.resolvePath(DB_FILE);
 	conn = new SQLConnection();
@@ -619,7 +621,7 @@ public function saveRedmine(event:RedmineEvent):void
 	stmt.execute();
 }
 
-public function showIssueInfo(event:Event):void
+public function displayIssueInfo(event:Event):void
 {
 	var targetXML:XML = event.target.selectedItem as XML
 	txtIssueDetail.text = targetXML.toString();
@@ -911,3 +913,25 @@ public function errorLogging(event:RedmineAirErrorEvent):void
 	log.error(event.errorMessage);
 }
 
+public function showIssueInfo(item:Object):String  
+{ 
+	return item.subject + "\n------------------------\n" + item.description.substring(0, 100) + '...';
+}
+
+private function changeFormat(event:Event = null):void 
+{
+	if (dgAssigned.selectedItem == null) {
+		return;
+	}
+	
+	var issue:XML = dgAssigned.selectedItem as XML;
+	if (btnFormat.getStyle("icon") == com.appspot.redmineAir.util.IconSet.xmlIcon) {
+        txtIssueDetail.text = issue.toXMLString();
+        btnFormat.setStyle("icon", com.appspot.redmineAir.util.IconSet.textIcon);
+        btnFormat.toolTip = "Show Text";
+    } else {
+        txtIssueDetail.text = issue.description;
+        btnFormat.setStyle("icon", com.appspot.redmineAir.util.IconSet.xmlIcon);
+        btnFormat.toolTip = "Show XML";					
+    }
+}
