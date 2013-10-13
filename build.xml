@@ -14,69 +14,77 @@
 	<property name="FLEX_HOME" location="C:/FlexSDK"/>
 	<property name="MXMLC.JAR" value="${FLEX_HOME}/lib/mxmlc.jar"/>
 
-	<!-- Flex task -->
-	<taskdef  resource="flexTasks.tasks" classpath="${FLEX_HOME}/ant/lib/flexTasks.jar"/>
-
 	<!-- Project properties -->
 	<property name="PROJ_ROOT_DIR" value="."/>
 	<property name="APP_NAME" value="redmineAir"/>
 	<property name="APP_ROOT_DIR" location="${PROJ_ROOT_DIR}"/>
-	<property name="APP_SRC_DIR" location="${APP_ROOT_DIR}/src"/>
+	<property name="APP_SRC_DIR" location="${APP_ROOT_DIR}/src/main"/>
 	<property name="APP_ROOT_FILE" value="${APP_NAME}.swf"/>
 	<property name="APP_DESCRIPTOR" location="${APP_SRC_DIR}/redmineAir-app.xml"/>
-        <property name="APP_SOURCE_FILE" value="${APP_ROOT_DIR}/src/${APP_NAME}.mxml"/> 	
+        <property name="APP_SOURCE_FILE" value="${APP_SRC_DIR}/${APP_NAME}.mxml"/> 	
 	<property name="AIR_NAME" value="${APP_NAME}.air"/>
-	<property name="debug"  location="${PROJ_ROOT_DIR}/debug"/> 
+	<property name="debug"  location="${PROJ_ROOT_DIR}/debug"/>
+	<property name="bin"  location="${PROJ_ROOT_DIR}/bin"/>	 
 	<property name="release"  location="${PROJ_ROOT_DIR}/release"/>
 	<property name="assets"  location="${PROJ_ROOT_DIR}/assets"/>
 	<property name="icons"  location="${APP_SRC_DIR}/icons"/>	
 	<property name="STORETYPE" value="pkcs12"/>
 	<property name="KEYSTORE" value="${APP_NAME}.p12"/>
+	<property name="report" location="${APP_ROOT_DIR}/report" />	
+	<property name="APP_TEST_DIR" location="${APP_ROOT_DIR}/src/test"/>
 
+	<!-- Flex task -->
+	<taskdef  resource="flexTasks.tasks" classpath="${FLEX_HOME}/ant/lib/flexTasks.jar"/>
+	<taskdef resource="flexUnitTasks.tasks">
+	   <classpath>
+	      <fileset dir="${APP_ROOT_DIR}/libs">
+	         <include name="flexUnitTasks*.jar" />
+	      </fileset>
+	   </classpath>
+	</taskdef>
+	
 	<target name="init" depends="clean">
 	    <mkdir dir="${debug}"/>
 		<mkdir dir="${release}"/>
+		<mkdir dir="${bin}"/>
+		<mkdir dir="${report}"/>		
 	</target>
-
-    <!-- debug用のコンパイル  -->
-    <target name="debugcompile" depends="init"> 
-        <java jar="${MXMLC.JAR}" fork="true" failonerror="true"> 
-            <arg value="-debug=true"/> 
-            <arg value="+flexlib=${FLEX_HOME}/frameworks"/> 
-            <arg value="+configname=air"/> 
-            <arg value="-file-specs=${APP_SOURCE_FILE}"/> 
-            <arg value="-output=${debug}/${APP_ROOT_FILE}"/> 
-            <arg value="-allow-source-path-overlap=true" />
-            <arg value="-locale=ja_JP,en_US" />
-            <arg value="-source-path=locale/{locale}" />
-            <arg value="-external-library-path+=libs/as3corelib.swc"/>
-            <arg value="-theme=${FLEX_HOME}/frameworks/themes/Halo/halo.swc"/>
-        </java> 
-        <!-- assetsも必要な場合は追加する
-             <copy todir="${debug}"> 
-                 <fileset dir="${assets}"/> 
-             </copy>
-          --> 
-    </target> 
     
-	<target name="run">
+	<!-- mxmlcの実行(debug用のコンパイル) -->
+	<target name="debugcompile" depends="init">
+            <mxmlc file="${APP_SRC_DIR}/${APP_NAME}.mxml" output="${APP_ROOT_DIR}/debug/${APP_NAME}.swf"
+		  allow-source-path-overlap="true" locale="ja_JP,en_US" debug="true">
+                <load-config filename="${FLEX_HOME}/frameworks/air-config.xml" />
+                <source-path path-element="${FLEX_HOME}/frameworks" />
+                <source-path path-element="locale/{locale}" />
+		<library-path dir="${basedir}/libs" append="true">                                  
+		    <include name="as3corelib.swc" />
+                </library-path>
+                <theme dir="${FLEX_HOME}/frameworks/themes/Halo">
+                    <include name="halo.swc" />
+                </theme>
+            </mxmlc>
+	</target>    
+    
+    <!-- デバッグ(trace有効)な場合の実行 -->
+	<target name="debugrun" depends="debugcompile">
 		<exec executable="${ADL}">
 			<arg value="${APP_DESCRIPTOR}"/>
-			<arg value="${APP_ROOT_DIR}"/>
+			<arg value="debug"/>
 		</exec>
 	</target>
 	
-    <target name="test" depends="debugcompile"> 
-        <exec executable="${ADL}"> 
-                 <arg value="${APP_DESCRIPTOR}"/> 
-            <arg value="${debug}"/> 
-             </exec>  
-    </target> 
+	<!-- リリース版のアプリケーションの実行 -->
+	<target name="run" depends="compile">
+		<exec executable="${ADL}">
+			<arg value="${APP_DESCRIPTOR}"/>
+			<arg value="bin"/>
+		</exec>
+	</target>	
 	
-
 	<!-- mxmlcの実行 -->
 	<target name="compile" depends="init">
-            <mxmlc file="${APP_SRC_DIR}/${APP_NAME}.mxml" output="${APP_ROOT_DIR}/${APP_NAME}.swf"
+            <mxmlc file="${APP_SRC_DIR}/${APP_NAME}.mxml" output="${APP_ROOT_DIR}/bin/${APP_NAME}.swf"
 		  allow-source-path-overlap="true" locale="ja_JP,en_US">
                 <load-config filename="${FLEX_HOME}/frameworks/air-config.xml" />
                 <source-path path-element="${FLEX_HOME}/frameworks" />
@@ -89,6 +97,30 @@
                 </theme>
             </mxmlc>
 	</target>
+	
+	<!-- Unit test -->
+	<target name="test" depends="compile">
+		<!-- Execute TestRunner.swf as FlexUnit tests and publish reports -->
+		<flexunit player="air" 
+           workingDir="${bin}"
+		   toDir="${report}" 
+		   haltonfailure="false" 
+		   verbose="true">
+		   <source dir="${APP_SRC_DIR}" />
+	       <testSource dir="${APP_TEST_DIR}">
+	          <include name="**/*Test.as" />
+	       </testSource>
+	       <library dir="${APP_ROOT_DIR}/libs" />
+	    </flexunit>
+
+		<!-- Generate readable JUnit-style reports -->
+		<junitreport todir="${report}">
+			<fileset dir="${report}">
+				<include name="TEST-*.xml" />
+			</fileset>
+			<report format="frames" todir="${report}/html" />
+		</junitreport>
+	</target>	
 
 	<target name="package" depends="compile">
 		<java jar="${ADT.JAR}" fork="true" failonerror="true">
@@ -103,7 +135,7 @@
 			<arg value="${APP_DESCRIPTOR}"/>
 
 			<arg value="-C"/>
-			<arg value="${APP_ROOT_DIR}"/>
+			<arg value="${APP_ROOT_DIR}/bin"/>
 			<arg value="${APP_ROOT_FILE}"/>
 			<arg value="-C"/>
 			<arg value="${APP_SRC_DIR}"/>
@@ -114,6 +146,8 @@
 	<target name="clean" description="clean up">
 	    <delete dir="${debug}"/> 
 		<delete dir="${release}"/>
+		<delete dir="${bin}"/>
+		<delete dir="${report}"/>				
 	</target>
 
 

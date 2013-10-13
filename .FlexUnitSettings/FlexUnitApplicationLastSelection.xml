@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testrun name="" >
+<testsuite  name="Default Test Suite" project="redmineair">
+<testsuite name="com.appspot.redmineAir.test:FunctionTest" type="testsuiteclass"/>
+<testsuite name="com.appspot.redmineAir.test:URLUtilTest" type="testcaseclass"/>
+</testsuite>
+</testrun>

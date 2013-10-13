@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Panel xmlns:mx="http://www.adobe.com/2006/mxml" xmlns:view="com.appspot.redmineAir.view.*"
+	horizontalAlign="center" verticalAlign="middle"
+	width="536" height="270" 
+	verticalGap="2" horizontalGap="2" paddingTop="1">
+	<view:SaveRedmineWindowViewHelper id="viewHelper"/>
+	
+<mx:Form width="484" verticalGap="1" height="170" paddingTop="3">
+    <mx:FormItem label="Redmine URL" direction="horizontal">
+        <mx:TextInput id="txtUrl" width="280" toolTip="Enter URL for Redmine. (exp. http://www.redmine.org/)"/> 
+    </mx:FormItem>
+    <mx:FormItem label="API Key" direction="horizontal" toolTip="Enter API key for Redmine.">
+        <mx:TextInput id="txtKey" width="280" displayAsPassword="{!chkShowAsPasswd.selected}" /> 
+    </mx:FormItem>
+    <mx:FormItem label="Feed Key" direction="horizontal" toolTip="Enter ASS feed key for Redmine (Optional)">
+        <mx:TextInput id="txtFeedKey" width="280" displayAsPassword="{!chkShowAsPasswd.selected}"/> 
+    </mx:FormItem>
+    <mx:FormItem label="Show keys as plain text">
+    	<mx:CheckBox id="chkShowAsPasswd" selected="false"/>
+    </mx:FormItem>    
+    <mx:FormItem label="Redmine Name" direction="horizontal" toolTip="Enter the name for Redmine.">
+        <mx:TextInput id="txtName" width="200"/> 
+    </mx:FormItem>      
+	<mx:FormItem label="Note" direction="horizontal" toolTip="Enter notes for Redmine.">
+		<mx:TextInput id="txtNote" width="280"/> 
+	</mx:FormItem>    
+</mx:Form>
+<mx:ControlBar horizontalAlign="center">
+	<mx:Button id="btnSave" label="Save"/>
+	<!-- <mx:Button id="btnSave" label="Save" click="saveRedmine(event)">
+	</mx:Button> -->
+	<mx:Button id="btnCancel" label="Cancel"/>
+	<!-- <mx:Button id="btnCancel" label="Cancel" click="closeWindow(event)">
+	</mx:Button> -->	
+</mx:ControlBar>
+</mx:Panel>

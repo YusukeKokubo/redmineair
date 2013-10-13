@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<application xmlns="http://ns.adobe.com/air/application/2.0">
+
+    <id>com.appspot.redmineAir</id>
+    <filename>redmineair</filename>
+    <name>redmineair</name>
+    <version>0.0.5</version>
+
+    <description>
+        <text xml:lang="en">RedmineAir: Air application for Redmine which communicate with server via REST api.</text> 
+        <text xml:lang="ja">RedmineAir: RedmineのREST apiを利用してRedmineの情報を取得するAIRアプリケーションです。</text>
+    </description>
+
+    <copyright>Yusuke Kokubo, Akiko Takano, Go Meada, Haru Iida, Yasuhiro Morikawa.</copyright> 
+
+    <initialWindow>
+        <content>redmineAir.swf</content>
+        <title>RedmineAir</title>
+    </initialWindow>
+
+    <icon>     
+        <image16x16>icons/icon_016.png</image16x16>
+        <image32x32>icons/icon_032.png</image32x32>
+        <image48x48>icons/icon_048.png</image48x48>
+        <image128x128>icons/icon_128.png</image128x128>
+    </icon>
+
+</application>
